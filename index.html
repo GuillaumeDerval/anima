@@ -234,6 +234,16 @@
                         </template>
                     </div>
 
+                    <template x-if="defender.defenseType === 'parry'">
+                        <div class="input-group" style="margin-top: 10px;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" x-model="defender.hasShield"
+                                    style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                                <span>🛡️ Bouclier</span>
+                            </label>
+                        </div>
+                    </template>
+
                     <div class="input-group">
                         <label>Valeur de Défense</label>
                         <input type="number" x-model.number="defender.defense" placeholder="Ex: 100">
@@ -243,6 +253,14 @@
                         <label>Bonus de Défense</label>
                         <input type="number" x-model.number="defender.defenseBonus" placeholder="Ex: 15">
                     </div>
+
+                    <template x-if="attacker.attackType !== 'melee'">
+                        <div class="input-group">
+                            <label>Malus contre projectiles</label>
+                            <input type="number" :value="getProjectileDefensePenalty()" disabled
+                                style="background-color: #f0f0f0; cursor: not-allowed;">
+                        </div>
+                    </template>
 
                     <div class="input-group">
                         <label>Indice de Protection (IP) contre <span
@@ -481,6 +499,11 @@
                                 style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
                             <span>Maître en Esquive</span>
                         </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" x-model="characterForm.hasShield"
+                                style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                            <span>🛡️ Bouclier</span>
+                        </label>
                     </div>
                 </div>
 
@@ -558,6 +581,7 @@
                     masterAttack: false,
                     masterParry: false,
                     masterDodge: false,
+                    hasShield: false,
                     ip: {
                         blunt: 0,
                         slash: 0,
@@ -596,6 +620,7 @@
                     diceRoll: null,
                     isMasterParry: false,
                     isMasterDodge: false,
+                    hasShield: false,
                     showModifiers: false,
                     modifierSearch: '',
                     activeModifiers: [],
@@ -695,6 +720,7 @@
                         masterAttack: false,
                         masterParry: false,
                         masterDodge: false,
+                        hasShield: false,
                         ip: {
                             blunt: 0,
                             slash: 0,
@@ -722,6 +748,7 @@
                         masterAttack: char.masterAttack || false,
                         masterParry: char.masterParry || false,
                         masterDodge: char.masterDodge || false,
+                        hasShield: char.hasShield || false,
                         ip: char.ip || {
                             blunt: 0,
                             slash: 0,
@@ -796,6 +823,7 @@
                             this.defender.character = char;
                             this.defender.isMasterParry = char.masterParry || false;
                             this.defender.isMasterDodge = char.masterDodge || false;
+                            this.defender.hasShield = char.hasShield || false;
 
                             // Choisir automatiquement le type de défense avec la valeur la plus élevée
                             const parryValue = char.parry || 0;
@@ -880,6 +908,42 @@
                     if (!search) return modifiers;
 
                     return modifiers.filter(mod => mod.name.toLowerCase().includes(search));
+                },
+
+                getProjectileDefensePenalty() {
+                    // Malus de défense contre projectiles
+                    if (this.attacker.attackType === 'melee') return 0;
+
+                    const isProjectile = this.attacker.attackType === 'projectile'; // tiré
+                    const isThrown = this.attacker.attackType === 'thrown'; // lancé
+                    const isParry = this.defender.defenseType === 'parry';
+                    const isDodge = this.defender.defenseType === 'dodge';
+                    const isMaster = isParry ? this.defender.isMasterParry : this.defender.isMasterDodge;
+                    const hasShield = this.defender.hasShield;
+
+                    // Esquive
+                    if (isDodge) {
+                        if (isMaster) return 0;
+                        if (isProjectile) return -30; // esquive contre tir
+                        if (isThrown) return 0; // esquive contre lancé
+                    }
+
+                    // Parade
+                    if (isParry) {
+                        if (isProjectile) {
+                            // Parade contre tir
+                            if (hasShield) {
+                                return isMaster ? 0 : -30;
+                            }
+                            return isMaster ? -20 : -80;
+                        }
+                        if (isThrown) {
+                            // Parade contre lancé
+                            return isMaster ? 0 : -50;
+                        }
+                    }
+
+                    return 0;
                 },
 
                 getDefenderModifierValue(mod) {
@@ -968,7 +1032,8 @@
                     if (!this.defender.diceRoll) return '-';
                     const base = (this.defender.defense || 0) + (this.defender.diceRoll || 0) + (this.defender.defenseBonus || 0);
                     const modifiers = this.getActiveModifiersBonus('defender');
-                    return base + modifiers;
+                    const projectilePenalty = this.getProjectileDefensePenalty();
+                    return base + modifiers + projectilePenalty;
                 },
 
                 getMargin() {
