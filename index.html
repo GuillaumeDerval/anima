@@ -36,6 +36,10 @@
                 <button class="btn-add-character" @click="openCharacterModal()">
                     + Nouveau Personnage
                 </button>
+                <a href="critique.html" target="_blank" class="btn btn-primary"
+                    style="text-decoration: none; display: block; margin-top: 10px; text-align: center;">
+                    💀 Calcul de critique
+                </a>
             </div>
 
             <!-- Zone de combat -->
@@ -378,11 +382,21 @@
                             </div>
                         </template>
                         <template x-if="getDamageMultiplier() > 0">
-                            <div style="font-size: 1.3em; margin-top: 15px;">
-                                <strong>Dégâts infligés :</strong>
-                                <span x-text="getTotalDamage()"></span> × <span x-text="getDamageMultiplier()"></span>%
-                                =
-                                <span style="color: #dc3545; font-size: 1.2em;" x-text="getFinalDamage()"></span>
+                            <div>
+                                <div style="font-size: 1.3em; margin-top: 15px;">
+                                    <strong>Dégâts infligés :</strong>
+                                    <span x-text="getTotalDamage()"></span> × <span
+                                        x-text="getDamageMultiplier()"></span>%
+                                    =
+                                    <span style="color: #dc3545; font-size: 1.2em;" x-text="getFinalDamage()"></span>
+                                </div>
+                                <div style="margin-top: 15px;">
+                                    <button class="btn btn-primary"
+                                        @click="window.open('critique.html?damage=' + getFinalDamage() + '&defender=' + encodeURIComponent(defender.character?.name || '') + '&resistance=' + (defender.character?.physicalResistance || 0), '_blank')"
+                                        style="width: 100%;">
+                                        💀 Calculer le coup critique
+                                    </button>
+                                </div>
                             </div>
                         </template>
                     </div>
@@ -478,6 +492,11 @@
                 <div class="input-group">
                     <label>Malus par attaque supplémentaire</label>
                     <input type="number" x-model.number="characterForm.attackPenalty" placeholder="Ex: 25" min="0">
+                </div>
+
+                <div class="input-group">
+                    <label>Résistance physique</label>
+                    <input type="number" x-model.number="characterForm.physicalResistance" placeholder="Ex: 50" min="0">
                 </div>
 
                 <div style="margin-top: 20px; padding-top: 15px; border-top: 2px solid #e9ecef;">
@@ -578,6 +597,7 @@
                     damageType: 'blunt',
                     ipIgnored: 0,
                     attackPenalty: 0,
+                    physicalResistance: 0,
                     masterAttack: false,
                     masterParry: false,
                     masterDodge: false,
@@ -747,6 +767,7 @@
                         attackType: 'melee',
                         damageType: 'blunt',
                         attackPenalty: 0,
+                        physicalResistance: 0,
                         masterAttack: false,
                         masterParry: false,
                         masterDodge: false,
@@ -775,6 +796,7 @@
                         attackType: char.attackType || 'melee',
                         damageType: char.damageType || 'blunt',
                         attackPenalty: char.attackPenalty || 0,
+                        physicalResistance: char.physicalResistance || 0,
                         masterAttack: char.masterAttack || false,
                         masterParry: char.masterParry || false,
                         masterDodge: char.masterDodge || false,
