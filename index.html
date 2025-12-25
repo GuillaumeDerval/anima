@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anima Beyond Fantasy - Gestionnaire de Combat</title>
+    <link rel="stylesheet" href="style.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body>
+    <div class="container" x-data="animaApp()">
+        <h1>⚔️ Anima Beyond Fantasy - Combat Manager</h1>
+
+        <div class="main-layout">
+            <!-- Panel de personnages -->
+            <div class="characters-panel">
+                <h2>Personnages</h2>
+                <div class="character-list">
+                    <template x-for="char in characters" :key="char.id">
+                        <div class="character-item"
+                            :class="{ 'selected': selectedCharacter && selectedCharacter.id === char.id }">
+                            <span class="character-name" @click="selectCharacter(char)" x-text="char.name"></span>
+                            <div class="character-actions">
+                                <button class="btn-icon" @click="editCharacter(char)" title="Éditer">
+                                    ✏️
+                                </button>
+                                <button class="btn-icon" @click="deleteCharacter(char.id)" title="Supprimer">
+                                    🗑️
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <button class="btn-add-character" @click="openCharacterModal()">
+                    + Nouveau Personnage
+                </button>
+            </div>
+
+            <!-- Zone de combat -->
+            <div class="combat-area">
+                <!-- Panel Attaquant -->
+                <div class="combat-panel attacker">
+                    <div class="panel-header">
+                        <h2 class="panel-title">⚔️ Attaquant</h2>
+                        <select class="character-select" x-model="attacker.characterId"
+                            @change="loadCharacterStats('attacker')">
+                            <option value="">-- Sélectionner --</option>
+                            <template x-for="char in characters" :key="char.id">
+                                <option :value="char.id" x-text="char.name"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Type d'Attaque</label>
+                        <select x-model="attacker.attackType">
+                            <option value="melee">Corps à corps</option>
+                            <option value="thrown">Lancé</option>
+                            <option value="projectile">Tiré</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Type de Dégâts</label>
+                        <select x-model="attacker.damageType" @change="updateDefenderIP()">
+                            <option value="blunt">Contondant</option>
+                            <option value="slash">Tranchant</option>
+                            <option value="pierce">Perçant</option>
+                            <option value="heat">Chaleur</option>
+                            <option value="electricity">Électricité</option>
+                            <option value="cold">Froid</option>
+                            <option value="energy">Énergie</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group" style="margin-top: 10px;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" x-model="attacker.isMaster"
+                                style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                            <span>⚔️ Maître en Attaque</span>
+                        </label>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>Valeur d'Attaque</label>
+                            <input type="number" x-model.number="attacker.attack" placeholder="Ex: 120">
+                        </div>
+
+                        <div class="input-group">
+                            <label>Dégâts de Base</label>
+                            <input type="number" x-model.number="attacker.damage" placeholder="Ex: 50">
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>Bonus d'Attaque</label>
+                            <input type="number" x-model.number="attacker.attackBonus" placeholder="Ex: 10">
+                        </div>
+                        <div class="input-group">
+                            <label>Bonus de Dégâts</label>
+                            <input type="number" x-model.number="attacker.damageBonus" placeholder="Ex: 5">
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>IP ignorée par l'attaque</label>
+                        <input type="number" x-model.number="attacker.ipIgnored" placeholder="Ex: 0" min="0">
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>Nombre d'attaques</label>
+                            <input type="number" x-model.number="attacker.numberOfAttacks" placeholder="Ex: 1" min="1">
+                        </div>
+                        <div class="input-group">
+                            <label>Malus par att. sup.</label>
+                            <input type="number" x-model.number="attacker.attackPenalty" placeholder="Ex: 25" min="0">
+                        </div>
+                    </div>
+
+                    <!-- Modificateurs Attaquant -->
+                    <div class="modifiers-section">
+                        <!-- Modificateurs actifs (toujours visibles) -->
+                        <template x-if="attacker.activeModifiers.length > 0">
+                            <div style="padding: 10px; background: #f8f9fa; border-bottom: 1px solid #e9ecef;">
+                                <div style="font-weight: 600; margin-bottom: 8px; color: #555;">🎯 Modificateurs actifs
+                                    :</div>
+                                <template x-for="modName in attacker.activeModifiers" :key="modName">
+                                    <div class="modifier-item">
+                                        <input type="checkbox" :id="'att-mod-active-' + modName"
+                                            x-model="attacker.activeModifiers" :value="modName"
+                                            @change="calculateResults()" checked>
+                                        <label :for="'att-mod-active-' + modName"
+                                            x-text="(attackModifiers.find(m => m.name === modName) || attackModifiersProjectile.find(m => m.name === modName))?.name"></label>
+                                        <span class="modifier-value"
+                                            :class="(attackModifiers.find(m => m.name === modName) || attackModifiersProjectile.find(m => m.name === modName))?.attack >= 0 ? 'positive' : 'negative'"
+                                            x-text="((attackModifiers.find(m => m.name === modName) || attackModifiersProjectile.find(m => m.name === modName))?.attack >= 0 ? '+' : '') + (attackModifiers.find(m => m.name === modName) || attackModifiersProjectile.find(m => m.name === modName))?.attack"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <!-- En-tête pour ajouter des modificateurs -->
+                        <div class="modifiers-header" @click="attacker.showModifiers = !attacker.showModifiers">
+                            <span>➕ Ajouter des modificateurs
+                                <template x-if="getActiveModifiersBonus('attacker') !== 0">
+                                    <span>(Total: <span
+                                            :class="getActiveModifiersBonus('attacker') >= 0 ? 'positive' : 'negative'"
+                                            x-text="(getActiveModifiersBonus('attacker') >= 0 ? '+' : '') + getActiveModifiersBonus('attacker')"></span>)</span>
+                                </template>
+                            </span>
+                            <span x-text="attacker.showModifiers ? '▲' : '▼'"></span>
+                        </div>
+
+                        <!-- Recherche et modificateurs inactifs (cachés/affichés) -->
+                        <div x-show="attacker.showModifiers" class="modifiers-content">
+                            <div class="modifiers-search">
+                                <input type="text" x-model="attacker.modifierSearch"
+                                    placeholder="Rechercher un modificateur...">
+                            </div>
+                            <template x-for="mod in getFilteredModifiers('attacker')" :key="mod.name">
+                                <div class="modifier-item" x-show="!attacker.activeModifiers.includes(mod.name)">
+                                    <input type="checkbox" :id="'att-mod-' + mod.name"
+                                        x-model="attacker.activeModifiers" :value="mod.name"
+                                        @change="calculateResults()">
+                                    <label :for="'att-mod-' + mod.name" x-text="mod.name"></label>
+                                    <span class="modifier-value" :class="mod.attack >= 0 ? 'positive' : 'negative'"
+                                        x-text="(mod.attack >= 0 ? '+' : '') + mod.attack"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>
+                            Jet de dé (d100)
+                            <span class="dice-icon" @click="rollDice('attacker')" title="Lancer le dé">🎲</span>
+                        </label>
+                        <input type="number" x-model.number="attacker.diceRoll" placeholder="Ex: 75" min="1"
+                            @input="calculateResults()">
+                    </div>
+
+                    <div class="results show">
+                        <div class="result-item">
+                            <span class="result-label">Total Attaque</span>
+                            <span class="result-value" x-text="getTotalAttack()"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Dégâts Potentiels</span>
+                            <span class="result-value" x-text="getTotalDamage()"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel Défenseur -->
+                <div class="combat-panel defender">
+                    <div class="panel-header">
+                        <h2 class="panel-title">🛡️ Défenseur</h2>
+                        <select class="character-select" x-model="defender.characterId"
+                            @change="loadCharacterStats('defender')">
+                            <option value="">-- Sélectionner --</option>
+                            <template x-for="char in characters" :key="char.id">
+                                <option :value="char.id" x-text="char.name"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Type de Défense</label>
+                        <select x-model="defender.defenseType" @change="updateDefenseValue()">
+                            <option value="dodge">Esquive</option>
+                            <option value="parry">Parade</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group" style="margin-top: 10px;">
+                        <template x-if="defender.defenseType === 'parry'">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" x-model="defender.isMasterParry"
+                                    style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                                <span>🛡️ Maître en Parade</span>
+                            </label>
+                        </template>
+                        <template x-if="defender.defenseType === 'dodge'">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" x-model="defender.isMasterDodge"
+                                    style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                                <span>💨 Maître en Esquive</span>
+                            </label>
+                        </template>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Valeur de Défense</label>
+                        <input type="number" x-model.number="defender.defense" placeholder="Ex: 100">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Bonus de Défense</label>
+                        <input type="number" x-model.number="defender.defenseBonus" placeholder="Ex: 15">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Indice de Protection (IP) contre <span
+                                x-text="getDamageTypeLabel(attacker.damageType)"></span></label>
+                        <input type="number" x-model.number="defender.appliedIP" placeholder="Ex: 4">
+                    </div>
+
+                    <!-- Modificateurs Défenseur -->
+                    <div class="modifiers-section">
+                        <!-- Modificateurs actifs (toujours visibles) -->
+                        <template x-if="defender.activeModifiers.length > 0">
+                            <div style="padding: 10px; background: #f8f9fa; border-bottom: 1px solid #e9ecef;">
+                                <div style="font-weight: 600; margin-bottom: 8px; color: #555;">🛡️ Modificateurs actifs
+                                    :</div>
+                                <template x-for="modName in defender.activeModifiers" :key="modName">
+                                    <div class="modifier-item">
+                                        <input type="checkbox" :id="'def-mod-active-' + modName"
+                                            x-model="defender.activeModifiers" :value="modName"
+                                            @change="calculateResults()" checked>
+                                        <label :for="'def-mod-active-' + modName"
+                                            x-text="defenseModifiers.find(m => m.name === modName)?.name"></label>
+                                        <span class="modifier-value"
+                                            :class="getDefenderModifierValue(defenseModifiers.find(m => m.name === modName)) >= 0 ? 'positive' : 'negative'"
+                                            x-text="(getDefenderModifierValue(defenseModifiers.find(m => m.name === modName)) >= 0 ? '+' : '') + getDefenderModifierValue(defenseModifiers.find(m => m.name === modName))"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <!-- En-tête pour ajouter des modificateurs -->
+                        <div class="modifiers-header" @click="defender.showModifiers = !defender.showModifiers">
+                            <span>➕ Ajouter des modificateurs
+                                <template x-if="getActiveModifiersBonus('defender') !== 0">
+                                    <span>(Total: <span
+                                            :class="getActiveModifiersBonus('defender') >= 0 ? 'positive' : 'negative'"
+                                            x-text="(getActiveModifiersBonus('defender') >= 0 ? '+' : '') + getActiveModifiersBonus('defender')"></span>)</span>
+                                </template>
+                            </span>
+                            <span x-text="defender.showModifiers ? '▲' : '▼'"></span>
+                        </div>
+
+                        <!-- Recherche et modificateurs inactifs (cachés/affichés) -->
+                        <div x-show="defender.showModifiers" class="modifiers-content">
+                            <div class="modifiers-search">
+                                <input type="text" x-model="defender.modifierSearch"
+                                    placeholder="Rechercher un modificateur...">
+                            </div>
+                            <template x-for="mod in getFilteredModifiers('defender')" :key="mod.name">
+                                <div class="modifier-item" x-show="!defender.activeModifiers.includes(mod.name)">
+                                    <input type="checkbox" :id="'def-mod-' + mod.name"
+                                        x-model="defender.activeModifiers" :value="mod.name"
+                                        @change="calculateResults()">
+                                    <label :for="'def-mod-' + mod.name" x-text="mod.name"></label>
+                                    <span class="modifier-value"
+                                        :class="getDefenderModifierValue(mod) >= 0 ? 'positive' : 'negative'"
+                                        x-text="(getDefenderModifierValue(mod) >= 0 ? '+' : '') + getDefenderModifierValue(mod)"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>
+                            Jet de dé (d100)
+                            <span class="dice-icon" @click="rollDice('defender')" title="Lancer le dé">🎲</span>
+                        </label>
+                        <input type="number" x-model.number="defender.diceRoll" placeholder="Ex: 50" min="1"
+                            @input="calculateResults()">
+                    </div>
+
+                    <div class="results show">
+                        <div class="result-item">
+                            <span class="result-label">Total Défense</span>
+                            <span class="result-value" x-text="getTotalDefense()"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Résultat final -->
+        <div style="max-width: 1400px; margin: 0 auto;">
+            <div class="results show" x-show="attacker.diceRoll && defender.diceRoll">
+                <div class="result-item">
+                    <span class="result-label">Marge (Attaque - Défense)</span>
+                    <span class="result-value" x-text="getMargin()"></span>
+                </div>
+
+                <!-- Égalité -->
+                <template x-if="getMargin() === 0">
+                    <div class="final-result" style="background: #fff3cd !important; color: #856404;">
+                        <div style="font-size: 2em; margin-bottom: 10px;">⚔️ ÉGALITÉ !</div>
+                        <div>Aucun effet, les combattants sont à égalité.</div>
+                    </div>
+                </template>
+
+                <!-- Défenseur touché -->
+                <template x-if="getMargin() > 0">
+                    <div class="final-result hit">
+                        <div style="font-size: 2em; margin-bottom: 10px;">💥 TOUCHÉ !</div>
+                        <div style="margin-bottom: 10px;">
+                            <strong>Marge :</strong> <span x-text="getMargin()"></span>
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <strong>Réduction :</strong> 10 × <span x-text="defender.appliedIP"></span> + 20 = <span
+                                x-text="10 * (defender.appliedIP || 0) + 20"></span>
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <strong>Résultat :</strong> <span x-text="getDamageMultiplier()"></span>%
+                        </div>
+                        <template x-if="getDamageMultiplier() === 0">
+                            <div
+                                style="font-size: 1.2em; margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 5px; color: #856404;">
+                                ⚠️ Pas de dégâts, mais le défenseur est <strong>mis sur la défensive</strong> !
+                            </div>
+                        </template>
+                        <template x-if="getDamageMultiplier() > 0">
+                            <div style="font-size: 1.3em; margin-top: 15px;">
+                                <strong>Dégâts infligés :</strong>
+                                <span x-text="getTotalDamage()"></span> × <span x-text="getDamageMultiplier()"></span>%
+                                =
+                                <span style="color: #dc3545; font-size: 1.2em;" x-text="getFinalDamage()"></span>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Contre-attaque possible -->
+                <template x-if="getMargin() < 0">
+                    <div class="final-result miss">
+                        <div style="font-size: 2em; margin-bottom: 10px;">🛡️ DÉFENSE RÉUSSIE !</div>
+                        <div style="margin-bottom: 15px;">
+                            L'attaque a été <span
+                                x-text="defender.defenseType === 'dodge' ? 'esquivée' : 'parée'"></span> !
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <strong>Marge :</strong> <span x-text="getMargin()"></span>
+                        </div>
+                        <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                            <div style="font-size: 1.2em; margin-bottom: 10px; color: #155724;">
+                                ⚔️ <strong>Contre-attaque disponible !</strong>
+                            </div>
+                            <div style="margin-bottom: 10px; color: #155724;">
+                                Bonus d'attaque : <strong x-text="getCounterAttackBonus()"></strong>
+                            </div>
+                            <button class="btn btn-primary" @click="prepareCounterAttack()" style="width: 100%;">
+                                🔄 Lancer une contre-attaque
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Modal de création/édition de personnage -->
+        <div class="modal" :class="{ 'show': showCharacterModal }">
+            <div class="modal-content">
+                <div class="modal-header" x-text="editingCharacter ? 'Éditer le Personnage' : 'Nouveau Personnage'">
+                </div>
+
+                <div class="input-group">
+                    <label>Nom du Personnage</label>
+                    <input type="text" x-model="characterForm.name" placeholder="Ex: Aragorn">
+                </div>
+
+                <div class="input-row">
+                    <div class="input-group">
+                        <label>Attaque</label>
+                        <input type="number" x-model.number="characterForm.attack" placeholder="Ex: 120">
+                    </div>
+                    <div class="input-group">
+                        <label>Dégâts</label>
+                        <input type="number" x-model.number="characterForm.damage" placeholder="Ex: 50">
+                    </div>
+                </div>
+
+                <div class="input-row">
+                    <div class="input-group">
+                        <label>Parade</label>
+                        <input type="number" x-model.number="characterForm.parry" placeholder="Ex: 100">
+                    </div>
+                    <div class="input-group">
+                        <label>Esquive</label>
+                        <input type="number" x-model.number="characterForm.dodge" placeholder="Ex: 90">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Type d'Attaque</label>
+                    <select x-model="characterForm.attackType">
+                        <option value="melee">Corps à corps</option>
+                        <option value="thrown">Lancé</option>
+                        <option value="projectile">Tiré</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label>Type de Dégâts</label>
+                    <select x-model="characterForm.damageType">
+                        <option value="blunt">Contondant</option>
+                        <option value="slash">Tranchant</option>
+                        <option value="pierce">Perçant</option>
+                        <option value="heat">Chaleur</option>
+                        <option value="electricity">Électricité</option>
+                        <option value="cold">Froid</option>
+                        <option value="energy">Énergie</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label>IP ignorée par l'attaque</label>
+                    <input type="number" x-model.number="characterForm.ipIgnored" placeholder="Ex: 0" min="0">
+                </div>
+
+                <div class="input-group">
+                    <label>Malus par attaque supplémentaire</label>
+                    <input type="number" x-model.number="characterForm.attackPenalty" placeholder="Ex: 25" min="0">
+                </div>
+
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 2px solid #e9ecef;">
+                    <label
+                        style="display: block; margin-bottom: 10px; font-weight: 700; color: #667eea;">Maîtrises</label>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" x-model="characterForm.masterAttack"
+                                style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                            <span>Maître en Attaque</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" x-model="characterForm.masterParry"
+                                style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                            <span>Maître en Parade</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" x-model="characterForm.masterDodge"
+                                style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                            <span>Maître en Esquive</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 2px solid #e9ecef;">
+                    <label style="display: block; margin-bottom: 10px; font-weight: 700; color: #667eea;">Indices
+                        de
+                        Protection (IP)</label>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>Contondant</label>
+                            <input type="number" x-model.number="characterForm.ip.blunt" placeholder="Ex: 4">
+                        </div>
+                        <div class="input-group">
+                            <label>Tranchant</label>
+                            <input type="number" x-model.number="characterForm.ip.slash" placeholder="Ex: 3">
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>Perçant</label>
+                            <input type="number" x-model.number="characterForm.ip.pierce" placeholder="Ex: 2">
+                        </div>
+                        <div class="input-group">
+                            <label>Chaleur</label>
+                            <input type="number" x-model.number="characterForm.ip.heat" placeholder="Ex: 1">
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>Électricité</label>
+                            <input type="number" x-model.number="characterForm.ip.electricity" placeholder="Ex: 1">
+                        </div>
+                        <div class="input-group">
+                            <label>Froid</label>
+                            <input type="number" x-model.number="characterForm.ip.cold" placeholder="Ex: 1">
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Énergie</label>
+                        <input type="number" x-model.number="characterForm.ip.energy" placeholder="Ex: 0">
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" @click="closeCharacterModal()">Annuler</button>
+                    <button class="btn btn-primary" @click="saveCharacter()">
+                        <span x-text="editingCharacter ? 'Mettre à jour' : 'Créer'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function animaApp() {
+            return {
+                characters: [],
+                selectedCharacter: null,
+                showCharacterModal: false,
+                editingCharacter: null,
+                characterForm: {
+                    name: '',
+                    attack: 0,
+                    damage: 0,
+                    parry: 0,
+                    dodge: 0,
+                    attackType: 'melee',
+                    damageType: 'blunt',
+                    ipIgnored: 0,
+                    attackPenalty: 0,
+                    masterAttack: false,
+                    masterParry: false,
+                    masterDodge: false,
+                    ip: {
+                        blunt: 0,
+                        slash: 0,
+                        pierce: 0,
+                        heat: 0,
+                        electricity: 0,
+                        cold: 0,
+                        energy: 0
+                    }
+                },
+                attacker: {
+                    characterId: '',
+                    attack: 0,
+                    damage: 0,
+                    attackType: 'melee',
+                    damageType: 'blunt',
+                    ipIgnored: 0,
+                    attackBonus: 0,
+                    damageBonus: 0,
+                    numberOfAttacks: 1,
+                    attackPenalty: 0,
+                    diceRoll: null,
+                    isMaster: false,
+                    showModifiers: false,
+                    modifierSearch: '',
+                    activeModifiers: [],
+                    results: null
+                },
+                defender: {
+                    characterId: '',
+                    defenseType: 'dodge',
+                    defense: 0,
+                    defenseBonus: 0,
+                    damageType: 'blunt',
+                    appliedIP: 0,
+                    diceRoll: null,
+                    isMasterParry: false,
+                    isMasterDodge: false,
+                    showModifiers: false,
+                    modifierSearch: '',
+                    activeModifiers: [],
+                    character: null,
+                    results: null
+                },
+                combatResult: null,
+
+                // Liste des modificateurs (Tableau 43: Situations spéciales de combat)
+                attackModifiers: [
+                    { name: 'Adversaire minuscule', attack: -20 },
+                    { name: 'Petit adversaire', attack: -10 },
+                    { name: 'Position supérieure', attack: 20 },
+                    { name: 'Cécité partielle', attack: -30 },
+                    { name: 'Cécité totale', attack: -100 },
+                    { name: 'De dos', attack: -30 },
+                    { name: 'De flanc', attack: -10 },
+                    { name: 'Dégainer', attack: -25 },
+                    { name: 'En charge', attack: 10 },
+                    { name: 'En joue', attack: -20 },
+                    { name: 'En lévitation', attack: -20 },
+                    { name: 'Espace réduit', attack: -40 },
+                    { name: 'Paralysie légère', attack: -20 },
+                    { name: 'Paralysie partielle', attack: -80 },
+                    { name: 'Paralysie totale', attack: -200 },
+                    { name: 'Qualité de Vol 7-14', attack: 10 },
+                    { name: 'Qualité de Vol 15+', attack: 15 },
+                    { name: 'Renversé', attack: -30 }
+                ],
+                attackModifiersProjectile: [
+                    { name: "Se déplacer de plus d'un quart de son Mouvement", attack: -10 },
+                    { name: "Courir à son Mouvement maximum", attack: -50 },
+                    { name: "Faible visibilité", attack: -20 },
+                    { name: "Cible à couvert", attack: -40 },
+                    { name: "Changer de cible", attack: -10 },
+                    { name: "Si la cible se déplace à 8-9 de Mouvement", attack: -20 },
+                    { name: "Si la cible se déplace à 10 de Mouvement", attack: -40 },
+                    { name: "Si la cible se déplace à plus de 10 en Mouvement", attack: -60 },
+                    { name: "Après s'être défendu au cours du même round", attack: -40 },
+                    { name: "Attaquer plus loin que la portée efficace de l'arme", attack: -30 },
+                    { name: "Grande cible", attack: 30 },
+                    { name: "Viser pendant un round", attack: 10 },
+                    { name: "Viser pendant deux rounds", attack: 20 },
+                    { name: "Viser pendant trois rounds", attack: 30 },
+                    { name: "Tirer à bout portant", attack: 30 }
+                ],
+                defenseModifiers: [
+                    { name: 'Cécité partielle', parry: -30, dodge: -15 },
+                    { name: 'Cécité totale', parry: -80, dodge: -80 },
+                    { name: 'De dos', parry: -80, dodge: -80 },
+                    { name: 'De flanc', parry: -30, dodge: -30 },
+                    { name: 'Dégainer', parry: -25, dodge: 0 },
+                    { name: 'En charge', parry: -10, dodge: -20 },
+                    { name: 'En joue', parry: -120, dodge: -120 },
+                    { name: 'En lévitation', parry: -20, dodge: -40 },
+                    { name: 'Espace réduit', parry: -40, dodge: -40 },
+                    { name: 'Paralysie légère', parry: -20, dodge: -40 },
+                    { name: 'Paralysie partielle', parry: -80, dodge: -80 },
+                    { name: 'Paralysie totale', parry: -200, dodge: -200 },
+                    { name: 'Qualité de Vol 7-14', parry: 10, dodge: 10 },
+                    { name: 'Qualité de Vol 15+', parry: 10, dodge: 20 },
+                    { name: 'Renversé', parry: -30, dodge: -30 },
+                    { name: 'Surprise', parry: -90, dodge: -90 },
+                    { name: "Deuxième défense", parry: -30, dodge: -30 },
+                    { name: "Troisième défense", parry: -50, dodge: -50 },
+                    { name: "Quatrième défense", parry: -70, dodge: -70 },
+                    { name: "Cinquième défense et +", parry: -90, dodge: -90 }
+                ],
+
+                init() {
+                    this.loadCharacters();
+                },
+
+                loadCharacters() {
+                    const stored = localStorage.getItem('animaCharacters');
+                    if (stored) {
+                        this.characters = JSON.parse(stored);
+                    }
+                },
+
+                saveCharactersToStorage() {
+                    localStorage.setItem('animaCharacters', JSON.stringify(this.characters));
+                },
+
+                openCharacterModal() {
+                    this.showCharacterModal = true;
+                    this.editingCharacter = null;
+                    this.characterForm = {
+                        name: '',
+                        attack: 0,
+                        damage: 0,
+                        parry: 0,
+                        dodge: 0,
+                        attackType: 'melee',
+                        damageType: 'blunt',
+                        attackPenalty: 0,
+                        masterAttack: false,
+                        masterParry: false,
+                        masterDodge: false,
+                        ip: {
+                            blunt: 0,
+                            slash: 0,
+                            pierce: 0,
+                            heat: 0,
+                            electricity: 0,
+                            cold: 0,
+                            energy: 0
+                        }
+                    };
+                },
+
+                closeCharacterModal() {
+                    this.showCharacterModal = false;
+                    this.editingCharacter = null;
+                },
+
+                editCharacter(char) {
+                    this.editingCharacter = char;
+                    this.characterForm = {
+                        ...char,
+                        attackType: char.attackType || 'melee',
+                        damageType: char.damageType || 'blunt',
+                        attackPenalty: char.attackPenalty || 0,
+                        masterAttack: char.masterAttack || false,
+                        masterParry: char.masterParry || false,
+                        masterDodge: char.masterDodge || false,
+                        ip: char.ip || {
+                            blunt: 0,
+                            slash: 0,
+                            pierce: 0,
+                            heat: 0,
+                            electricity: 0,
+                            cold: 0,
+                            energy: 0
+                        }
+                    };
+                    this.showCharacterModal = true;
+                },
+
+                saveCharacter() {
+                    if (!this.characterForm.name.trim()) {
+                        alert('Le nom du personnage est requis');
+                        return;
+                    }
+
+                    if (this.editingCharacter) {
+                        // Mise à jour
+                        const index = this.characters.findIndex(c => c.id === this.editingCharacter.id);
+                        if (index !== -1) {
+                            this.characters[index] = { ...this.characterForm, id: this.editingCharacter.id };
+                        }
+                    } else {
+                        // Création
+                        const newChar = {
+                            ...this.characterForm,
+                            id: Date.now().toString()
+                        };
+                        this.characters.push(newChar);
+                    }
+
+                    this.saveCharactersToStorage();
+                    this.closeCharacterModal();
+                },
+
+                deleteCharacter(id) {
+                    if (confirm('Êtes-vous sûr de vouloir supprimer ce personnage ?')) {
+                        this.characters = this.characters.filter(c => c.id !== id);
+                        this.saveCharactersToStorage();
+
+                        // Réinitialiser si le personnage était sélectionné
+                        if (this.attacker.characterId === id) {
+                            this.attacker.characterId = '';
+                        }
+                        if (this.defender.characterId === id) {
+                            this.defender.characterId = '';
+                        }
+                    }
+                },
+
+                selectCharacter(char) {
+                    this.selectedCharacter = char;
+                },
+
+                loadCharacterStats(role) {
+                    const charId = this[role].characterId;
+                    const char = this.characters.find(c => c.id === charId);
+
+                    if (char) {
+                        if (role === 'attacker') {
+                            this.attacker.attack = char.attack;
+                            this.attacker.damage = char.damage;
+                            this.attacker.attackType = char.attackType || 'melee';
+                            this.attacker.damageType = char.damageType || 'blunt';
+                            this.attacker.ipIgnored = char.ipIgnored || 0;
+                            this.attacker.attackPenalty = char.attackPenalty || 0;
+                            this.attacker.isMaster = char.masterAttack || false;
+                        } else {
+                            this.defender.character = char;
+                            this.defender.isMasterParry = char.masterParry || false;
+                            this.defender.isMasterDodge = char.masterDodge || false;
+
+                            // Choisir automatiquement le type de défense avec la valeur la plus élevée
+                            const parryValue = char.parry || 0;
+                            const dodgeValue = char.dodge || 0;
+                            this.defender.defenseType = parryValue >= dodgeValue ? 'parry' : 'dodge';
+
+                            this.updateDefenseValue();
+                            this.updateAppliedIP();
+                            // Charger l'IP approprié si le personnage a des IPs
+                            if (char.ip) {
+                                const attackerChar = this.characters.find(c => c.id === this.attacker.characterId);
+                                const damageType = (attackerChar && attackerChar.damageType) ? attackerChar.damageType : 'blunt';
+                                this.defender.appliedIP = char.ip[damageType] || 0;
+                            }
+                        }
+                    }
+                },
+
+                updateDefenseValue() {
+                    if (this.defender.character) {
+                        if (this.defender.defenseType === 'dodge') {
+                            this.defender.defense = this.defender.character.dodge || 0;
+                        } else if (this.defender.defenseType === 'parry') {
+                            this.defender.defense = this.defender.character.parry || 0;
+                        }
+                    }
+                    this.updateAppliedIP();
+                },
+
+                updateAppliedIP() {
+                    if (this.defender.character && this.defender.character.ip) {
+                        const damageType = this.attacker.damageType || 'blunt';
+                        this.defender.appliedIP = this.defender.character.ip[damageType] || 0;
+                    }
+                },
+
+                updateDefenderIP() {
+                    if (this.defender.character && this.defender.character.ip) {
+                        const damageType = this.attacker.damageType || 'blunt';
+                        this.defender.appliedIP = this.defender.character.ip[damageType] || 0;
+                    }
+                },
+
+                getDamageTypeLabel(type) {
+                    const labels = {
+                        'blunt': 'Contondant',
+                        'slash': 'Tranchant',
+                        'pierce': 'Perçant',
+                        'heat': 'Chaleur',
+                        'electricity': 'Électricité',
+                        'cold': 'Froid',
+                        'energy': 'Énergie'
+                    };
+                    return labels[type] || type;
+                },
+
+                getAppliedIP() {
+                    if (this.defender.character && this.defender.character.ip) {
+                        const attackerChar = this.characters.find(c => c.id === this.attacker.characterId);
+                        if (attackerChar && attackerChar.damageType) {
+                            return this.defender.character.ip[attackerChar.damageType] || 0;
+                        }
+                    }
+                    return this.defender.appliedIP || 0;
+                },
+
+                getFilteredModifiers(role) {
+                    const search = role === 'attacker' ? this.attacker.modifierSearch.toLowerCase() : this.defender.modifierSearch.toLowerCase();
+                    let modifiers;
+
+                    if (role === 'attacker') {
+                        // Combiner attackModifiers avec attackModifiersProjectile si ce n'est pas du corps à corps
+                        if (this.attacker.attackType !== 'melee') {
+                            modifiers = [...this.attackModifiers, ...this.attackModifiersProjectile];
+                        } else {
+                            modifiers = this.attackModifiers;
+                        }
+                    } else {
+                        modifiers = this.defenseModifiers;
+                    }
+
+                    if (!search) return modifiers;
+
+                    return modifiers.filter(mod => mod.name.toLowerCase().includes(search));
+                },
+
+                getDefenderModifierValue(mod) {
+                    return this.defender.defenseType === 'parry' ? mod.parry : mod.dodge;
+                },
+
+                getActiveModifiersBonus(role) {
+                    if (role === 'attacker') {
+                        return this.attacker.activeModifiers.reduce((total, modName) => {
+                            const mod = this.attackModifiers.find(m => m.name === modName) || this.attackModifiersProjectile.find(m => m.name === modName);
+                            return total + (mod ? mod.attack : 0);
+                        }, 0);
+                    } else {
+                        return this.defender.activeModifiers.reduce((total, modName) => {
+                            const mod = this.defenseModifiers.find(m => m.name === modName);
+                            if (!mod) return total;
+                            const value = this.defender.defenseType === 'parry' ? mod.parry : mod.dodge;
+                            return total + value;
+                        }, 0);
+                    }
+                },
+
+                rollDice(role) {
+                    // Déterminer le seuil de fumble selon la maîtrise affichée dans l'interface
+                    let fumbleThreshold = 3; // Par défaut, fumble sur 1-3
+
+                    if (role === 'attacker') {
+                        if (this.attacker.isMaster) {
+                            fumbleThreshold = 2; // Maître en attaque : fumble sur 1-2
+                        }
+                    } else {
+                        const isMaster = this.defender.defenseType === 'parry' ? this.defender.isMasterParry : this.defender.isMasterDodge;
+                        if (isMaster) {
+                            fumbleThreshold = 2; // Maître en parade/esquive : fumble sur 1-2
+                        }
+                    }
+
+                    let total = 0;
+                    let roll = 0;
+                    let details = [];
+
+                    while (true) {
+                        roll = Math.floor(Math.random() * 100) + 1;
+                        details.push(roll);
+                        total += roll;
+
+                        if (details.length === 1 && roll <= fumbleThreshold) {
+                            // Fumble!
+                            roll = -(Math.floor(Math.random() * 100) + 1);
+                            details.push(roll);
+                            total += roll;
+                            break;
+                        }
+                        if (roll < 90 + details.length - 1)
+                            break;
+                    }
+
+                    // Afficher les détails du jet si étendu
+                    if (details.length > 1) {
+                        const detailStr = details.join(', ');
+                        alert(`Jet étendu ! Détails: [${detailStr}] = ${total}`);
+                    }
+
+                    if (role === 'attacker') {
+                        this.attacker.diceRoll = total;
+                    } else {
+                        this.defender.diceRoll = total;
+                    }
+
+                    this.calculateResults();
+                },
+
+                getTotalAttack() {
+                    if (!this.attacker.diceRoll) return '-';
+                    const base = (this.attacker.attack || 0) + (this.attacker.diceRoll || 0) + (this.attacker.attackBonus || 0);
+                    const modifiers = this.getActiveModifiersBonus('attacker');
+                    const multiAttackPenalty = ((this.attacker.numberOfAttacks || 1) - 1) * (this.attacker.attackPenalty || 0);
+                    return base + modifiers - multiAttackPenalty;
+                },
+
+                getTotalDamage() {
+                    return (this.attacker.damage || 0) + (this.attacker.damageBonus || 0);
+                },
+
+                getTotalDefense() {
+                    if (!this.defender.diceRoll) return '-';
+                    const base = (this.defender.defense || 0) + (this.defender.diceRoll || 0) + (this.defender.defenseBonus || 0);
+                    const modifiers = this.getActiveModifiersBonus('defender');
+                    return base + modifiers;
+                },
+
+                getMargin() {
+                    const totalAttack = this.getTotalAttack();
+                    const totalDefense = this.getTotalDefense();
+
+                    if (totalAttack === '-' || totalDefense === '-') {
+                        return 0;
+                    }
+
+                    return totalAttack - totalDefense;
+                },
+
+                getDamageMultiplier() {
+                    const margin = this.getMargin();
+                    if (margin <= 0) return 0;
+
+                    const ip = Math.max(0, (this.defender.appliedIP || 0) - (this.attacker.ipIgnored || 0));
+                    const reduction = 10 * ip + 20;
+                    const adjustedMargin = margin - reduction;
+
+                    // Arrondir à la dizaine inférieure
+                    const multiplier = Math.floor(adjustedMargin / 10) * 10;
+
+                    return Math.max(0, multiplier);
+                },
+
+                getFinalDamage() {
+                    const multiplier = this.getDamageMultiplier();
+                    if (multiplier === 0) return 0;
+
+                    const baseDamage = this.getTotalDamage();
+                    return Math.round(baseDamage * multiplier / 100);
+                },
+
+                getCounterAttackBonus() {
+                    const margin = this.getMargin();
+                    if (margin >= 0) return 0;
+
+                    const bonus = Math.floor(-margin / 2);
+                    return Math.min(bonus, 150);
+                },
+
+                prepareCounterAttack() {
+                    const bonus = this.getCounterAttackBonus();
+
+                    // Récupérer les personnages complets
+                    const oldAttackerChar = this.characters.find(c => c.id === this.attacker.characterId);
+                    const oldDefenderChar = this.characters.find(c => c.id === this.defender.characterId);
+
+                    // Sauvegarder les IDs pour inverser
+                    const tempAttackerId = this.attacker.characterId;
+                    const tempDefenderId = this.defender.characterId;
+
+                    // Réinitialiser complètement
+                    this.attacker.diceRoll = null;
+                    this.defender.diceRoll = null;
+                    this.attacker.attackBonus = 0;
+                    this.attacker.damageBonus = 0;
+                    this.defender.defenseBonus = 0;
+
+                    // Inverser les personnages : l'ancien défenseur devient l'attaquant
+                    this.attacker.characterId = tempDefenderId;
+                    if (oldDefenderChar) {
+                        this.attacker.attack = oldDefenderChar.attack;
+                        this.attacker.damage = oldDefenderChar.damage;
+                        this.attacker.damageType = oldDefenderChar.damageType || 'blunt';
+                        this.attacker.ipIgnored = oldDefenderChar.ipIgnored || 0;
+                        this.attacker.isMaster = oldDefenderChar.masterAttack || false;
+                    }
+                    this.attacker.attackBonus = bonus; // Ajouter le bonus de contre-attaque
+
+                    // L'ancien attaquant devient le défenseur
+                    this.defender.characterId = tempAttackerId;
+                    if (oldAttackerChar) {
+                        this.defender.character = oldAttackerChar;
+                        this.defender.isMasterParry = oldAttackerChar.masterParry || false;
+                        this.defender.isMasterDodge = oldAttackerChar.masterDodge || false;
+
+                        // Choisir automatiquement le type de défense avec la valeur la plus élevée
+                        const parryValue = oldAttackerChar.parry || 0;
+                        const dodgeValue = oldAttackerChar.dodge || 0;
+                        this.defender.defenseType = parryValue >= dodgeValue ? 'parry' : 'dodge';
+
+                        this.updateDefenseValue();
+                        this.updateAppliedIP();
+                    }
+                },
+
+                getCombatResult() {
+                    // Fonction conservée pour compatibilité mais non utilisée
+                    const totalAttack = this.getTotalAttack();
+                    const totalDefense = this.getTotalDefense();
+
+                    if (totalAttack === '-' || totalDefense === '-') {
+                        return { hit: false, attackTotal: 0, defenseTotal: 0, finalDamage: 0 };
+                    }
+
+                    const margin = this.getMargin();
+                    const hit = margin > 0;
+                    const finalDamage = hit ? this.getFinalDamage() : 0;
+
+                    return {
+                        hit: hit,
+                        attackTotal: totalAttack,
+                        defenseTotal: totalDefense,
+                        finalDamage: finalDamage
+                    };
+                },
+
+                calculateResults() {
+                    // Cette fonction est appelée pour forcer le recalcul
+                    // Alpine.js mettra automatiquement à jour l'affichage
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
