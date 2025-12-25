@@ -665,13 +665,13 @@
                     { name: 'Attaque visée: Tête', attack: -60 },
                     { name: 'Attaque visée: Tibia', attack: -10 },
                     { name: 'Attaque visée: Torse', attack: -10 },
-                    { name: 'Attaque spéciale: Renversement avec arme', attack: -60},
-                    { name: 'Attaque spéciale: Renversement à mains nues', attack: -30},
-                    { name: 'Attaque spéciale: Désarmement', attack: -40},
-                    { name: 'Attaque spéciale: Immobilisation', attack: -40},
-                    { name: 'Attaque spéciale: Mode secondaire', attack: -10},
-                    { name: 'Attaque spéciale: Attaque de zone', attack: -50},
-                    { name: 'Attaque spéciale: Tenir en joue', attack: -100}
+                    { name: 'Attaque spéciale: Renversement avec arme', attack: -60 },
+                    { name: 'Attaque spéciale: Renversement à mains nues', attack: -30 },
+                    { name: 'Attaque spéciale: Désarmement', attack: -40 },
+                    { name: 'Attaque spéciale: Immobilisation', attack: -40 },
+                    { name: 'Attaque spéciale: Mode secondaire', attack: -10 },
+                    { name: 'Attaque spéciale: Attaque de zone', attack: -50 },
+                    { name: 'Attaque spéciale: Tenir en joue', attack: -100 }
                 ],
                 attackModifiersProjectile: [
                     { name: "Se déplacer de plus d'un quart de son Mouvement", attack: -10 },
@@ -717,7 +717,7 @@
                     { name: "Ecarter", parry: -30, dodge: -30 },
                     { name: "Ecarter (défenseur)", parry: -10, dodge: -10 },
                     { name: "Défense totale", parry: 30, dodge: 30 },
-                    { name: "Résister aux coups", parry: -80, dodge: -80}
+                    { name: "Résister aux coups", parry: -80, dodge: -80 }
                 ],
 
                 init() {
@@ -1102,6 +1102,14 @@
                 getCounterAttackBonus() {
                     const margin = this.getMargin();
                     if (margin >= 0) return 0;
+
+                    // Si l'attaque était à projectile/tirée et pas à bout portant, pas de bonus
+                    if (this.attacker.attackType !== 'melee') {
+                        const hasPointBlank = this.attacker.activeModifiers.includes('Tirer à bout portant');
+                        if (!hasPointBlank) {
+                            return 0;
+                        }
+                    }
 
                     const bonus = Math.floor(-margin / 2);
                     return Math.min(bonus, 150);
