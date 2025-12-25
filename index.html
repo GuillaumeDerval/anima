@@ -648,7 +648,30 @@
                     { name: 'Paralysie totale', attack: -200 },
                     { name: 'Qualité de Vol 7-14', attack: 10 },
                     { name: 'Qualité de Vol 15+', attack: 15 },
-                    { name: 'Renversé', attack: -30 }
+                    { name: 'Renversé', attack: -30 },
+                    { name: 'Attaque visée: Abdomen', attack: -20 },
+                    { name: 'Attaque visée: Aine', attack: -60 },
+                    { name: 'Attaque visée: Bras', attack: -20 },
+                    { name: 'Attaque visée: Cœur', attack: -60 },
+                    { name: 'Attaque visée: Cou', attack: -80 },
+                    { name: 'Attaque visée: Coude', attack: -60 },
+                    { name: 'Attaque visée: Cuisse', attack: -20 },
+                    { name: 'Attaque visée: Épaule', attack: -30 },
+                    { name: 'Attaque visée: Genou', attack: -40 },
+                    { name: 'Attaque visée: Main', attack: -40 },
+                    { name: 'Attaque visée: Œil', attack: -100 },
+                    { name: 'Attaque visée: Pied', attack: -50 },
+                    { name: 'Attaque visée: Poignet', attack: -40 },
+                    { name: 'Attaque visée: Tête', attack: -60 },
+                    { name: 'Attaque visée: Tibia', attack: -10 },
+                    { name: 'Attaque visée: Torse', attack: -10 },
+                    { name: 'Attaque spéciale: Renversement avec arme', attack: -60},
+                    { name: 'Attaque spéciale: Renversement à mains nues', attack: -30},
+                    { name: 'Attaque spéciale: Désarmement', attack: -40},
+                    { name: 'Attaque spéciale: Immobilisation', attack: -40},
+                    { name: 'Attaque spéciale: Mode secondaire', attack: -10},
+                    { name: 'Attaque spéciale: Attaque de zone', attack: -50},
+                    { name: 'Attaque spéciale: Tenir en joue', attack: -100}
                 ],
                 attackModifiersProjectile: [
                     { name: "Se déplacer de plus d'un quart de son Mouvement", attack: -10 },
@@ -687,7 +710,14 @@
                     { name: "Deuxième défense", parry: -30, dodge: -30 },
                     { name: "Troisième défense", parry: -50, dodge: -50 },
                     { name: "Quatrième défense", parry: -70, dodge: -70 },
-                    { name: "Cinquième défense et +", parry: -90, dodge: -90 }
+                    { name: "Cinquième défense et +", parry: -90, dodge: -90 },
+                    { name: "Incapable de parer l'énergie", parry: -120, dodge: 0 },
+                    { name: "Incapable de sortir de la zone d'effet", parry: 0, dodge: -80 },
+                    { name: "Couverture d'allié avec bouclier surnaturel", parry: -40, dodge: 0 },
+                    { name: "Ecarter", parry: -30, dodge: -30 },
+                    { name: "Ecarter (défenseur)", parry: -10, dodge: -10 },
+                    { name: "Défense totale", parry: 30, dodge: 30 },
+                    { name: "Résister aux coups", parry: -80, dodge: -80}
                 ],
 
                 init() {
