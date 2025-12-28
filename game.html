@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anima Beyond Fantasy - Gestion de Partie</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="utils.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body>
+    <div class="container" x-data="gameApp()">
+        <h1>🎮 Anima Beyond Fantasy - Gestion de Partie</h1>
+
+        <div style="max-width: 1400px; margin: 20px auto;">
+            <div class="combat-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>⚔️ Combattants</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-success" @click="nextFighter()" :disabled="gameFighters.length === 0"
+                            x-text="currentFighterIndex === -1 ? '▶️ Début du tour - tri par initiative' : (currentFighterIndex === gameFighters.length - 1 ? '🔄 Nouveau tour: recalcul des initiatives' : '➡️ Joueur suivant')">
+                        </button>
+                        <button class="btn btn-primary" @click="sortByInitiative()">
+                            🔽 Trier par initiative
+                        </button>
+                        <button class="btn btn-primary" @click="showAddModal = true">
+                            ➕ Ajouter un combattant
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tableau des combattants -->
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; background: white;">
+                        <thead>
+                            <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Nom</th>
+                                <th style="padding: 12px; text-align: center; border: 1px solid #ddd; width: 120px;">PV
+                                    Actuels</th>
+                                <th style="padding: 12px; text-align: center; border: 1px solid #ddd; width: 120px;">PV
+                                    Max</th>
+                                <th style="padding: 12px; text-align: left; border: 1px solid #ddd; min-width: 250px;">
+                                    Status</th>
+                                <th style="padding: 12px; text-align: center; border: 1px solid #ddd; width: 120px;">
+                                    Init. Base</th>
+                                <th style="padding: 12px; text-align: center; border: 1px solid #ddd; width: 120px;">
+                                    Init. Réelle</th>
+                                <th style="padding: 12px; text-align: center; border: 1px solid #ddd; width: 100px;">
+                                    Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Ligne spéciale "Nouveau tour" -->
+                            <tr
+                                :style="'border-bottom: 2px solid #667eea;' + (currentFighterIndex === -1 ? 'background: linear-gradient(90deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%); border-left: 4px solid #667eea;' : '')">
+                                <td colspan="7"
+                                    style="padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-style: italic; color: #667eea;">
+                                    🔄 Nouveau tour - Mise à jour des initiatives
+                                    <span x-show="currentFighterIndex === -1" style="margin-left: 8px;">◀ Tour
+                                        actuel</span>
+                                </td>
+                            </tr>
+
+                            <template x-if="gameFighters.length === 0">
+                                <tr>
+                                    <td colspan="7" style="padding: 40px; text-align: center; color: #999;">
+                                        Aucun combattant. Cliquez sur "Ajouter un combattant" pour commencer.
+                                    </td>
+                                </tr>
+                            </template>
+                            <template x-for="(fighter, index) in gameFighters" :key="fighter.id">
+                                <tr
+                                    :style="'border-bottom: 1px solid #ddd;' + (index === currentFighterIndex ? 'background: linear-gradient(90deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%); border-left: 4px solid #667eea;' : '')">
+                                    <td style="padding: 12px; border: 1px solid #ddd; font-weight: 600;">
+                                        <span x-text="fighter.name"></span>
+                                        <span x-show="index === currentFighterIndex"
+                                            style="margin-left: 8px; color: #667eea; font-weight: bold;">◀ Tour
+                                            actuel</span>
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">
+                                        <input type="number" x-model.number="fighter.currentHP"
+                                            :style="'width: 80px; text-align: center; font-weight: bold; color: ' + (fighter.currentHP <= fighter.maxHP * 0.25 ? '#dc3545' : fighter.currentHP <= fighter.maxHP * 0.5 ? '#ffc107' : '#28a745')"
+                                            @input="saveFighters()">
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">
+                                        <input type="number" x-model.number="fighter.maxHP"
+                                            style="width: 80px; text-align: center;" @input="saveFighters()">
+                                    </td>
+                                    <td style="padding: 8px; border: 1px solid #ddd;">
+                                        <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                                            <template x-for="status in (fighter.statuses || [])" :key="status.id">
+                                                <span
+                                                    style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: #f0f0f0; border-radius: 12px; font-size: 12px;">
+                                                    <span x-text="getStatusDisplay(status)"></span>
+                                                    <button @click="openStatusModal(fighter.id, status.id)"
+                                                        style="background: none; border: none; cursor: pointer; padding: 0; color: #667eea; font-weight: bold; font-size: 14px;"
+                                                        title="Éditer le status">✏️</button>
+                                                    <button @click="removeStatus(fighter.id, status.id)"
+                                                        style="background: none; border: none; cursor: pointer; padding: 0; color: #dc3545; font-weight: bold; font-size: 14px;"
+                                                        title="Retirer le status">×</button>
+                                                </span>
+                                            </template>
+                                            <button class="btn-icon" @click="openStatusModal(fighter.id)"
+                                                title="Ajouter un status">
+                                                ➕
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">
+                                        <input type="number" x-model.number="fighter.baseInitiative"
+                                            style="width: 80px; text-align: center;" @input="saveFighters()">
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">
+                                        <input type="number" x-model.number="fighter.actualInitiative"
+                                            style="width: 80px; text-align: center; font-weight: bold; color: #667eea;"
+                                            @input="saveFighters()">
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">
+                                        <button class="btn-icon" @click="removeFighter(fighter.id)"
+                                            title="Retirer du combat">
+                                            🗑️
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Liens vers autres pages -->
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <a href="index.html" class="btn btn-secondary"
+                        style="text-decoration: none; flex: 1; text-align: center;">
+                        ⚔️ Combat Manager
+                    </a>
+                    <a href="critique.html" target="_blank" class="btn btn-secondary"
+                        style="text-decoration: none; flex: 1; text-align: center;">
+                        💀 Calcul de critique
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal d'ajout de combattant -->
+        <div class="modal" :class="{ 'show': showAddModal }">
+            <div class="modal-content">
+                <div class="modal-header">Ajouter un combattant</div>
+
+                <div class="input-group">
+                    <label>Sélectionner un personnage existant</label>
+                    <select x-model="selectedCharacterId" @change="loadCharacterToForm()">
+                        <option value="">-- Nouveau combattant --</option>
+                        <template x-for="char in characters" :key="char.id">
+                            <option :value="char.id" x-text="char.name"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label>Nom</label>
+                    <input type="text" x-model="fighterForm.name" placeholder="Ex: Gobelin">
+                </div>
+
+                <div class="input-row">
+                    <div class="input-group">
+                        <label>PV Actuels</label>
+                        <input type="number" x-model.number="fighterForm.currentHP" placeholder="Ex: 100">
+                    </div>
+                    <div class="input-group">
+                        <label>PV Maximum</label>
+                        <input type="number" x-model.number="fighterForm.maxHP" placeholder="Ex: 100">
+                    </div>
+                </div>
+
+                <div class="input-row">
+                    <div class="input-group">
+                        <label>Initiative de base</label>
+                        <input type="number" x-model.number="fighterForm.baseInitiative" placeholder="Ex: 50">
+                    </div>
+                    <div class="input-group">
+                        <label>Initiative réelle</label>
+                        <input type="number" x-model.number="fighterForm.actualInitiative" placeholder="Ex: 75">
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" @click="closeAddModal()">Annuler</button>
+                    <button class="btn btn-primary" @click="addFighter()">Ajouter</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal d'ajout de status -->
+        <div class="modal" :class="{ 'show': showStatusModal }">
+            <div class="modal-content">
+                <div class="modal-header" x-text="editingStatusId ? 'Modifier un status' : 'Ajouter un status'"></div>
+
+                <div class="input-group">
+                    <label>Type de status</label>
+                    <select x-model="statusForm.type">
+                        <option value="penalty">Malus à toutes les actions</option>
+                        <option value="initiativePenalty">Bonus/Malus à l'initiative</option>
+                        <option value="custom">Status personnalisé</option>
+                    </select>
+                </div>
+
+                <!-- Formulaire pour malus -->
+                <template x-if="statusForm.type === 'penalty'">
+                    <div>
+                        <div class="input-group">
+                            <label>Réduction de 5 par tour</label>
+                            <input type="number" x-model.number="statusForm.reductionPerTurn" placeholder="Ex: 28"
+                                min="0">
+                        </div>
+                        <div class="input-group">
+                            <label>Long terme</label>
+                            <input type="number" x-model.number="statusForm.longTerm" placeholder="Ex: 20" min="0">
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Formulaire pour bonus/malus à l'initiative -->
+                <template x-if="statusForm.type === 'initiativePenalty'">
+                    <div>
+                        <div class="input-group">
+                            <label>Valeur du bonus/malus à l'initiative</label>
+                            <input type="number" x-model.number="statusForm.initiativePenaltyValue"
+                                placeholder="Ex: -30 ou +20">
+                        </div>
+                        <div class="input-group">
+                            <label>Durée (en tours, 0 = infini)</label>
+                            <input type="number" x-model.number="statusForm.initiativePenaltyDuration"
+                                placeholder="Ex: 3" min="0">
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Formulaire pour status personnalisé -->
+                <template x-if="statusForm.type === 'custom'">
+                    <div>
+                        <div class="input-group">
+                            <label>Nom du status</label>
+                            <input type="text" x-model="statusForm.customName" placeholder="Ex: Étourdi">
+                        </div>
+                        <div class="input-group">
+                            <label>Durée (en rounds, 0 = infini)</label>
+                            <input type="number" x-model.number="statusForm.duration" placeholder="Ex: 3" min="0">
+                        </div>
+                    </div>
+                </template>
+
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" @click="closeStatusModal()">Annuler</button>
+                    <button class="btn btn-primary" @click="addStatus()"
+                        x-text="editingStatusId ? 'Modifier' : 'Ajouter'"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function gameApp() {
+            return {
+                characters: [],
+                gameFighters: [],
+                currentFighterIndex: -1,
+                showAddModal: false,
+                showStatusModal: false,
+                selectedCharacterId: '',
+                currentFighterId: null,
+                editingStatusId: null,
+                fighterForm: {
+                    name: '',
+                    currentHP: 100,
+                    maxHP: 100,
+                    baseInitiative: 0,
+                    actualInitiative: 0
+                },
+                statusForm: {
+                    type: 'penalty',
+                    reductionPerTurn: 0,
+                    longTerm: 0,
+                    initiativePenaltyValue: 0,
+                    initiativePenaltyDuration: 0,
+                    customName: '',
+                    duration: 0
+                },
+
+                init() {
+                    // Charger les personnages depuis localStorage
+                    const stored = localStorage.getItem('animaCharacters');
+                    if (stored) {
+                        this.characters = JSON.parse(stored);
+                    }
+
+                    // Charger les combattants de la partie en cours
+                    const storedFighters = localStorage.getItem('animaGameFighters');
+                    if (storedFighters) {
+                        this.gameFighters = JSON.parse(storedFighters);
+                    }
+
+                    // recalculer les initiatives
+                    this.rollInitiatives();
+                    // Trier les combattants par nom pour simplifier l'entrée des initiatives
+                    this.gameFighters.sort((a, b) => a.name.localeCompare(b.name));
+                },
+
+                loadCharacterToForm() {
+                    if (!this.selectedCharacterId) {
+                        this.fighterForm = {
+                            name: '',
+                            currentHP: 100,
+                            maxHP: 100,
+                            baseInitiative: 0,
+                            actualInitiative: 0
+                        };
+                        return;
+                    }
+
+                    const char = this.characters.find(c => c.id === this.selectedCharacterId);
+                    if (char) {
+                        this.fighterForm = {
+                            name: char.name,
+                            currentHP: 100, // À ajuster selon les besoins
+                            maxHP: 100,
+                            baseInitiative: 0,
+                            actualInitiative: 0
+                        };
+                    }
+                },
+
+                addFighter() {
+                    if (!this.fighterForm.name.trim()) {
+                        alert('Le nom est requis');
+                        return;
+                    }
+
+                    const newFighter = {
+                        id: Date.now().toString(),
+                        ...this.fighterForm,
+                        statuses: []
+                    };
+
+                    this.gameFighters.push(newFighter);
+                    this.saveFighters();
+                    this.closeAddModal();
+                },
+
+                removeFighter(id) {
+                    if (confirm('Retirer ce combattant de la partie ?')) {
+                        this.gameFighters = this.gameFighters.filter(f => f.id !== id);
+                        this.saveFighters();
+                    }
+                },
+
+                sortByInitiative() {
+                    this.gameFighters.sort((a, b) => b.actualInitiative - a.actualInitiative);
+                    this.currentFighterIndex = -1;
+                    this.saveFighters();
+                },
+
+                saveFighters() {
+                    localStorage.setItem('animaGameFighters', JSON.stringify(this.gameFighters));
+                },
+
+                closeAddModal() {
+                    this.showAddModal = false;
+                    this.selectedCharacterId = '';
+                    this.fighterForm = {
+                        name: '',
+                        currentHP: 100,
+                        maxHP: 100,
+                        baseInitiative: 0,
+                        actualInitiative: 0
+                    };
+                },
+
+                openStatusModal(fighterId, statusId = null) {
+                    this.currentFighterId = fighterId;
+                    this.editingStatusId = statusId;
+
+                    if (statusId) {
+                        // Mode édition : charger les données du status
+                        const fighter = this.gameFighters.find(f => f.id === fighterId);
+                        if (fighter && fighter.statuses) {
+                            const status = fighter.statuses.find(s => s.id === statusId);
+                            if (status) {
+                                this.statusForm = {
+                                    type: status.type,
+                                    reductionPerTurn: status.reductionPerTurn || 0,
+                                    longTerm: status.longTerm || 0,
+                                    initiativePenaltyValue: status.initiativePenaltyValue || 0,
+                                    initiativePenaltyDuration: status.initiativePenaltyDuration || 0,
+                                    customName: status.customName || '',
+                                    duration: status.duration || 0
+                                };
+                            }
+                        }
+                    }
+
+                    this.showStatusModal = true;
+                },
+
+                closeStatusModal() {
+                    this.showStatusModal = false;
+                    this.currentFighterId = null;
+                    this.editingStatusId = null;
+                    this.statusForm = {
+                        type: 'penalty',
+                        reductionPerTurn: 0,
+                        longTerm: 0,
+                        initiativePenaltyValue: 0,
+                        initiativePenaltyDuration: 0,
+                        customName: '',
+                        duration: 0
+                    };
+                },
+
+                addStatus() {
+                    if (!this.currentFighterId) return;
+
+                    const fighter = this.gameFighters.find(f => f.id === this.currentFighterId);
+                    if (!fighter) return;
+
+                    if (!fighter.statuses) {
+                        fighter.statuses = [];
+                    }
+
+                    if (this.editingStatusId) {
+                        // Mode édition : modifier le status existant
+                        const statusIndex = fighter.statuses.findIndex(s => s.id === this.editingStatusId);
+                        if (statusIndex !== -1) {
+                            const updatedStatus = {
+                                id: this.editingStatusId,
+                                type: this.statusForm.type
+                            };
+
+                            if (this.statusForm.type === 'penalty') {
+                                updatedStatus.penaltyValue = this.statusForm.reductionPerTurn + this.statusForm.longTerm;
+                                updatedStatus.reductionPerTurn = this.statusForm.reductionPerTurn;
+                                updatedStatus.longTerm = this.statusForm.longTerm;
+                            } else if (this.statusForm.type === 'initiativePenalty') {
+                                updatedStatus.initiativePenaltyValue = this.statusForm.initiativePenaltyValue;
+                                updatedStatus.initiativePenaltyDuration = this.statusForm.initiativePenaltyDuration;
+                            } else {
+                                if (!this.statusForm.customName.trim()) {
+                                    alert('Le nom du status est requis');
+                                    return;
+                                }
+                                updatedStatus.customName = this.statusForm.customName;
+                                updatedStatus.duration = this.statusForm.duration;
+                            }
+
+                            fighter.statuses[statusIndex] = updatedStatus;
+                        }
+                    } else {
+                        // Mode ajout : créer un nouveau status
+                        const newStatus = {
+                            id: Date.now().toString(),
+                            type: this.statusForm.type
+                        };
+
+                        if (this.statusForm.type === 'penalty') {
+                            newStatus.penaltyValue = this.statusForm.reductionPerTurn + this.statusForm.longTerm;
+                            newStatus.reductionPerTurn = this.statusForm.reductionPerTurn;
+                            newStatus.longTerm = this.statusForm.longTerm;
+                        } else if (this.statusForm.type === 'initiativePenalty') {
+                            newStatus.initiativePenaltyValue = this.statusForm.initiativePenaltyValue;
+                            newStatus.initiativePenaltyDuration = this.statusForm.initiativePenaltyDuration;
+                        } else {
+                            if (!this.statusForm.customName.trim()) {
+                                alert('Le nom du status est requis');
+                                return;
+                            }
+                            newStatus.customName = this.statusForm.customName;
+                            newStatus.duration = this.statusForm.duration;
+                        }
+
+                        fighter.statuses.push(newStatus);
+                    }
+
+                    this.saveFighters();
+                    this.closeStatusModal();
+                },
+
+                removeStatus(fighterId, statusId) {
+                    const fighter = this.gameFighters.find(f => f.id === fighterId);
+                    if (!fighter || !fighter.statuses) return;
+
+                    fighter.statuses = fighter.statuses.filter(s => s.id !== statusId);
+                    this.saveFighters();
+                },
+
+                getStatusDisplay(status) {
+                    if (status.type === 'penalty') {
+                        let text = `Malus: -${status.penaltyValue}`;
+                        if (status.reductionPerTurn > 0) text += ` (CT: ${status.reductionPerTurn})`;
+                        if (status.longTerm > 0) text += ` [LT: ${status.longTerm}]`;
+                        return text;
+                    } else if (status.type === 'initiativePenalty') {
+                        const sign = status.initiativePenaltyValue >= 0 ? '+' : '';
+                        let text = `Init: ${sign}${status.initiativePenaltyValue}`;
+                        if (status.initiativePenaltyDuration > 0) text += ` (${status.initiativePenaltyDuration} tours)`;
+                        return text;
+                    } else {
+                        let text = status.customName;
+                        if (status.duration > 0) text += ` (${status.duration} rounds)`;
+                        return text;
+                    }
+                },
+
+                nextFighter() {
+                    if (this.gameFighters.length === 0) return;
+
+                    // Mettre à jour les statuts du joueur courant (sauf pour "Nouveau tour")
+                    if (this.currentFighterIndex >= 0) {
+                        const currentFighter = this.gameFighters[this.currentFighterIndex];
+                        if (currentFighter) {
+                            this.updateStatuses(currentFighter);
+                        }
+                    }
+
+                    // Passer au joueur suivant
+                    if (this.currentFighterIndex === -1) {
+                        // Tri au début du tour
+                        this.sortByInitiative();
+                        this.currentFighterIndex = 0;
+                    } else if (this.currentFighterIndex === this.gameFighters.length - 1) {
+                        // Du dernier combattant à "Nouveau tour"
+                        this.currentFighterIndex = -1;
+                        // recalculer les initiatives
+                        this.rollInitiatives();
+                        // Trier les combattants par nom pour simplifier l'entrée des initiatives
+                        this.gameFighters.sort((a, b) => a.name.localeCompare(b.name));
+                    } else {
+                        // Combattant suivant
+                        this.currentFighterIndex++;
+                    }
+
+                    this.saveFighters();
+                },
+
+                rollInitiatives() {
+                    // Recalculer l'initiative réelle pour tous les combattants
+                    this.gameFighters.forEach(fighter => {
+                        const rollResult = rollOpenD100(false); // Pas de maîtrise pour les jets d'initiative
+
+                        // Calculer le modificateur d'initiative total
+                        let initiativeModifier = 0;
+                        if (fighter.statuses) {
+                            fighter.statuses.forEach(status => {
+                                if (status.type === 'initiativePenalty') {
+                                    initiativeModifier += status.initiativePenaltyValue;
+                                } else if (status.type === 'penalty') {
+                                    // Les malus à toutes les actions comptent pour la moitié à l'initiative
+                                    initiativeModifier += Math.floor(status.penaltyValue / 2);
+                                }
+                            });
+                        }
+
+                        // Gestion spéciale des fumbles sur les jets d'initiative
+                        if (rollResult.details[0] === 1) {
+                            fighter.actualInitiative = fighter.baseInitiative - 125 + initiativeModifier;
+                        } else if (rollResult.details[0] === 2) {
+                            fighter.actualInitiative = fighter.baseInitiative - 100 + initiativeModifier;
+                        } else if (rollResult.details[0] === 3) {
+                            fighter.actualInitiative = fighter.baseInitiative - 75 + initiativeModifier;
+                        } else {
+                            fighter.actualInitiative = fighter.baseInitiative + rollResult.total + initiativeModifier;
+                        }
+                    });
+                },
+
+                updateStatuses(fighter) {
+                    if (!fighter.statuses || fighter.statuses.length === 0) return;
+
+                    fighter.statuses = fighter.statuses.filter(status => {
+                        if (status.type === 'penalty') {
+                            // Réduire la partie "réduction de 5 par tour"
+                            if (status.reductionPerTurn > 0) {
+                                status.reductionPerTurn = Math.max(0, status.reductionPerTurn - 5);
+                            }
+
+                            // Recalculer penaltyValue
+                            status.penaltyValue = status.reductionPerTurn + status.longTerm;
+
+                            // Supprimer si les deux valeurs sont à 0
+                            return status.reductionPerTurn > 0 || status.longTerm > 0;
+                        } else if (status.type === 'initiativePenalty') {
+                            // Malus d'initiative : réduire la durée
+                            if (status.initiativePenaltyDuration > 0) {
+                                status.initiativePenaltyDuration--;
+                                // Supprimer si durée atteint 0
+                                return status.initiativePenaltyDuration > 0;
+                            }
+                            // Garder si durée était 0 (infini)
+                            return status.initiativePenaltyDuration === 0;
+                        } else {
+                            // Status personnalisé : réduire la durée
+                            if (status.duration > 0) {
+                                status.duration--;
+                                // Supprimer si durée atteint 0
+                                return status.duration > 0;
+                            }
+                            // Garder si durée était 0 (infini)
+                            return status.duration === 0;
+                        }
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
